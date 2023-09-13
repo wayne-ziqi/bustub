@@ -105,6 +105,18 @@ class Trie {
   // Create a new trie with the given root.
   explicit Trie(std::shared_ptr<const TrieNode> root) : root_(std::move(root)) {}
 
+  // recursively clone the trie
+  static auto Clone(const std::shared_ptr<const TrieNode> &node) -> std::shared_ptr<const TrieNode> {
+    if (node == nullptr) {
+      return nullptr;
+    }
+    auto new_node = node->Clone();
+    for (auto &child : new_node->children_) {
+      child.second = Clone(child.second);
+    }
+    return new_node;
+  }
+
  public:
   // Create an empty trie.
   Trie() = default;

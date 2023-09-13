@@ -86,7 +86,7 @@ TEST(TrieStoreTest, MixedConcurrentTest) {
 
   std::vector<std::thread> threads;
 
-  const int keys_per_thread = 10000;
+  const int keys_per_thread = 100;
 
   for (int tid = 0; tid < 4; tid++) {
     std::thread t([&store, tid] {

@@ -55,6 +55,23 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto GetNextPageId() const -> page_id_t;
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
+  auto SetKeyAt(int index, const KeyType &key) -> void;
+  auto KeyIndex(const KeyType &key, const KeyComparator &comparator) const -> int;
+  auto ValueAt(int index) const -> ValueType;
+  auto SetValueAt(int index, const ValueType &value) -> void;
+  auto ValueIndex(const ValueType &value) const -> int;
+  auto Insert(const KeyType &key, const ValueType &value, KeyComparator comparator) -> int;
+  auto Remove(int index) -> bool;
+
+  auto Split(BPlusTreeLeafPage *recipient) -> void;
+
+  /**
+   * move the content of given page to current page, IMPORTANT: you should always make sure the current page is recipient's right sibling
+   * @param sibling
+   */
+  auto MoveRightAllToLeft(BPlusTreeLeafPage *left) -> void;
+
+  auto GetItem(int index) const -> const MappingType &;
 
   /**
    * @brief For test only return a string representing all keys in
@@ -84,7 +101,8 @@ class BPlusTreeLeafPage : public BPlusTreePage {
  private:
   page_id_t next_page_id_;
   // Flexible array member for page data.
-  MappingType array_[0];
+  // FIXME: use trivially type array instead of vector
+  std::vector<MappingType> array_;
 };
 
 }  // namespace bustub

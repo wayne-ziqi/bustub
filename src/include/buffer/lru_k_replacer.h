@@ -30,10 +30,32 @@ class LRUKNode {
   /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
 
-  [[maybe_unused]] std::list<size_t> history_;
-  [[maybe_unused]] size_t k_;
-  [[maybe_unused]] frame_id_t fid_;
-  [[maybe_unused]] bool is_evictable_{false};
+  std::list<size_t> history_;
+  size_t k_;
+  frame_id_t fid_;
+  bool is_evictable_{false};
+
+ public:
+  LRUKNode(frame_id_t fid, size_t k) : k_(k), fid_(fid) {}
+  LRUKNode() = default;
+  ~LRUKNode() = default;
+  void AddHistory(size_t timestamp) {
+    history_.push_back(timestamp);
+    if (history_.size() > k_) {
+      history_.pop_front();
+    }
+  }
+  auto GetHistory() -> std::list<size_t> { return history_; }
+  auto GetBackwardKDistance(size_t current_timestamp) -> size_t {
+    if (history_.size() < k_) {
+      return std::numeric_limits<size_t>::max();
+    }
+    return current_timestamp - history_.front();
+  }
+  auto GetLeastRecentDistance(size_t current_timestamp) -> size_t { return current_timestamp - history_.front(); }
+  auto GetFrameId() -> frame_id_t { return fid_; }
+  auto SetEvictable(bool set_evictable) -> void { is_evictable_ = set_evictable; }
+  auto IsEvictable() -> bool { return is_evictable_; }
 };
 
 /**
@@ -150,12 +172,12 @@ class LRUKReplacer {
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.
-  [[maybe_unused]] std::unordered_map<frame_id_t, LRUKNode> node_store_;
-  [[maybe_unused]] size_t current_timestamp_{0};
-  [[maybe_unused]] size_t curr_size_{0};
-  [[maybe_unused]] size_t replacer_size_;
-  [[maybe_unused]] size_t k_;
-  [[maybe_unused]] std::mutex latch_;
+  std::unordered_map<frame_id_t, LRUKNode> node_store_;  // frame_id -> LRUKNode
+  size_t curr_timestamp_{0};
+  size_t curr_size_{0};   // number of evictable frames
+  size_t replacer_size_;  // maximum number of frames that can be stored
+  size_t k_;              // k for LRU-k
+  std::mutex latch_;      // mutex for curr_size_, node_store_, and curr_timestamp_
 };
 
 }  // namespace bustub

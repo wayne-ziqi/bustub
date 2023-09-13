@@ -75,6 +75,21 @@ class BPlusTree {
   // Insert a key-value pair into this B+ tree.
   auto Insert(const KeyType &key, const ValueType &value, Transaction *txn = nullptr) -> bool;
 
+  // Get leaf page containing particular key, if key not exists, return the leaf page that should contain it.
+  auto GetLeafPageRead(const KeyType &key, Transaction *txn = nullptr) -> ReadPageGuard;
+
+  auto GetLeafPageWrite(const KeyType &key, bool is_insert, std::vector<WritePageGuard> &concur_vec,
+                        std::vector<page_id_t> *path = nullptr, Transaction *txn = nullptr) -> WritePageGuard;
+
+  /**
+   * healper function to avoid fetching the guard twice within the same thread, the pid MUST be from path vector defined in
+   * member methods
+   * @param concur_vec
+   * @param pid
+   * @return
+   */
+  auto GetWriteGuardFromConVec(std::vector<WritePageGuard> &concur_vec, page_id_t pid) -> WritePageGuard;
+
   // Remove a key and its value from this B+ tree.
   void Remove(const KeyType &key, Transaction *txn);
 
@@ -82,7 +97,7 @@ class BPlusTree {
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *txn = nullptr) -> bool;
 
   // Return the page id of the root node
-  auto GetRootPageId() -> page_id_t;
+  auto GetRootPageId() const -> page_id_t;
 
   // Index iterator
   auto Begin() -> INDEXITERATOR_TYPE;

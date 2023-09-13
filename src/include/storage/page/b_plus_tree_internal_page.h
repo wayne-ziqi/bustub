@@ -61,6 +61,13 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   void SetKeyAt(int index, const KeyType &key);
 
   /**
+   * @param key
+   * @param comparator
+   * @return 0 if key is not found
+   */
+  auto KeyIndex(const KeyType &key, const KeyComparator &comparator) const -> int;
+
+  /**
    * @param value The value to search for
    * @return The index that corresponds to the specified value
    */
@@ -71,6 +78,22 @@ class BPlusTreeInternalPage : public BPlusTreePage {
    * @return The value at the index
    */
   auto ValueAt(int index) const -> ValueType;
+
+  auto Insert(const KeyType &key, const ValueType &value, KeyComparator comparator) -> int;
+
+  auto Remove(int index) -> bool;
+
+  auto SetLeftMostPageId(page_id_t page_id) -> void;
+
+  auto Split(BPlusTreeInternalPage *recipient) -> KeyType;
+
+  /**
+   * move the content of given page to current page, IMPORTANT: you should always make sure the current page is
+   * recipient's right sibling
+   * @param recipient
+   * @param key the parent key separating current page and recipient
+   */
+  auto MoveRightAllToLeft(BPlusTreeInternalPage *left, KeyType key) -> void;
 
   /**
    * @brief For test only, return a string representing all keys in
@@ -100,7 +123,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
  private:
   // Flexible array member for page data.
-  MappingType array_[0];
+  std::vector<MappingType> array_;
 };
 
 }  // namespace bustub
