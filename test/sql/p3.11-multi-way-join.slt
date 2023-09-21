@@ -1,7 +1,7 @@
 # 6 pts
 
 statement ok
-set force_optimizer_starter_rule=yes
+set force_optimizer_starter_rule=yes;
 
 statement ok
 create table t1(v1 int);

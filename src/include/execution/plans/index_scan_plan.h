@@ -42,7 +42,6 @@ class IndexScanPlanNode : public AbstractPlanNode {
 
   /** The table whose tuples should be scanned. */
   index_oid_t index_oid_;
-
   // Add anything you want here for index lookup
 
  protected:

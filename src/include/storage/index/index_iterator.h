@@ -42,7 +42,6 @@ class IndexIterator {
  private:
   // add your own private member variables here
   BufferPoolManager *bpm_;
-  ReadPageGuard guard_;
   const B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page_;
   int key_index_;
 };

@@ -55,6 +55,15 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
  private:
   /** The NestedLoopJoin plan node to be executed. */
   const NestedLoopJoinPlanNode *plan_;
+
+  /** The child executor that produces tuples for the left side of join. */
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  /** The child executor that produces tuples for the right side of join. */
+  std::unique_ptr<AbstractExecutor> right_executor_;
+
+  Tuple left_tuple_;
+  RID left_rid_;
+  bool may_have_more_ = false;  // whether the right table may have more candidates
 };
 
 }  // namespace bustub

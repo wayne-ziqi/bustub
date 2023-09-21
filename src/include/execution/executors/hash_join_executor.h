@@ -54,6 +54,12 @@ class HashJoinExecutor : public AbstractExecutor {
  private:
   /** The NestedLoopJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;
+
+  /** The child executor that produces tuples for the left side of join. */
+  std::unique_ptr<AbstractExecutor> left_child_;
+  /** The child executor that produces tuples for the right side of join. */
+  std::unique_ptr<AbstractExecutor> right_child_;
+
 };
 
 }  // namespace bustub

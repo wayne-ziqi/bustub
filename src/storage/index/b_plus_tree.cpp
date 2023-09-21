@@ -34,6 +34,9 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { return GetRootPageId() == INVALID
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetLeafPageRead(const KeyType &key, Transaction *txn) -> ReadPageGuard {
   page_id_t root_page_id = GetRootPageId();
+  if (root_page_id == INVALID_PAGE_ID) {
+    return {};
+  }
   // Fetch the root page.
   auto guard = bpm_->FetchPageRead(root_page_id);
   // Search the  B+ from the root page
@@ -254,8 +257,9 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *txn) {
       auto header_guard = bpm_->FetchPageWrite(header_page_id_);
       auto header_page = header_guard.template AsMut<BPlusTreeHeaderPage>();
       header_page->root_page_id_ = INVALID_PAGE_ID;
+      page_id_t leaf_page_id = leaf_guard.PageId();
       leaf_guard.Drop();
-      bpm_->DeletePage(leaf_guard.PageId());
+      bpm_->DeletePage(leaf_page_id);
     }
     return;
   }
@@ -438,6 +442,9 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *txn) {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Begin() -> INDEXITERATOR_TYPE {
   auto root_page_id = GetRootPageId();
+  if (root_page_id == INVALID_PAGE_ID) {
+    return INDEXITERATOR_TYPE(bpm_, ReadPageGuard(), -1);
+  }
   auto guard = bpm_->FetchPageRead(root_page_id);
   auto page = guard.template As<BPlusTreePage>();
   while (!page->IsLeafPage()) {
@@ -478,6 +485,9 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
   auto root_page_id = GetRootPageId();
+  if (root_page_id == INVALID_PAGE_ID) {
+    return INDEXITERATOR_TYPE(bpm_, ReadPageGuard(), -1);
+  }
   auto guard = bpm_->FetchPageRead(root_page_id);
   auto page = guard.template As<BPlusTreePage>();
   while (!page->IsLeafPage()) {

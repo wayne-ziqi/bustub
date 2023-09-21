@@ -47,6 +47,13 @@ class TableIterator {
 
   auto operator++() -> TableIterator &;
 
+  auto operator=(TableIterator &&that)  noexcept -> TableIterator & {
+    table_heap_ = that.table_heap_;
+    rid_ = that.rid_;
+    stop_at_rid_ = that.stop_at_rid_;
+    return *this;
+  }
+
  private:
   TableHeap *table_heap_;
   RID rid_;
