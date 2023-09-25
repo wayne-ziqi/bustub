@@ -18,7 +18,7 @@
 
 namespace bustub {
 
-auto LockManager::LockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool { return true; }
+auto LockManager::LockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool {}
 
 auto LockManager::UnlockTable(Transaction *txn, const table_oid_t &oid) -> bool { return true; }
 
@@ -51,6 +51,63 @@ void LockManager::RunCycleDetection() {
     {  // TODO(students): detect deadlock
     }
   }
+}
+auto LockManager::UpgradeLockTable(Transaction *txn, LockManager::LockMode lock_mode, const table_oid_t &oid) -> bool {
+
+}
+
+auto LockManager::UpgradeLockRow(bustub::Transaction *txn, bustub::LockManager::LockMode lock_mode,
+                                 const bustub::table_oid_t &oid, const bustub::RID &rid) -> bool {}
+
+auto LockManager::AreLocksCompatible(bustub::LockManager::LockMode l1, bustub::LockManager::LockMode l2) -> bool {
+  if (l1 == LockMode::INTENTION_SHARED) {
+    return l2 != LockMode::EXCLUSIVE;
+  }
+  if (l1 == LockMode::INTENTION_EXCLUSIVE) {
+    return l2 == LockMode::INTENTION_SHARED || l2 == LockMode::INTENTION_EXCLUSIVE;
+  }
+  if (l1 == LockMode::SHARED) {
+    return l2 == LockMode::INTENTION_SHARED || l2 == LockMode::SHARED;
+  }
+  if (l1 == LockMode::SHARED_INTENTION_EXCLUSIVE) {
+    return l2 == LockMode::INTENTION_SHARED;
+  }
+  BUSTUB_ASSERT(l1 == LockMode::EXCLUSIVE, "l1 should be exclusive");
+  return false;
+}
+
+auto LockManager::CanTxnTakeLock(Transaction *txn, LockManager::LockMode lock_mode) -> bool {
+  if (txn->GetState() == TransactionState::SHRINKING) {
+    if (lock_mode == LockMode::EXCLUSIVE || lock_mode == LockMode::INTENTION_EXCLUSIVE) {
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
+    }
+  }
+  if (txn->GetIsolationLevel() == IsolationLevel::READ_UNCOMMITTED) {
+    if (lock_mode == LockMode::SHARED || lock_mode == LockMode::INTENTION_SHARED ||
+        lock_mode == LockMode::SHARED_INTENTION_EXCLUSIVE) {
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_SHARED_ON_READ_UNCOMMITTED);
+    }
+  }
+  if (txn->GetIsolationLevel() == IsolationLevel::REPEATABLE_READ) {
+    if (txn->GetState() == TransactionState::SHRINKING) {
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
+    }
+  }
+  if (txn->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
+    if (txn->GetState() == TransactionState::SHRINKING &&
+        (lock_mode != LockMode::SHARED && lock_mode != LockMode::INTENTION_SHARED)) {
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
+    }
+  }
+  if (txn->GetIsolationLevel() == IsolationLevel::READ_UNCOMMITTED) {
+    if (lock_mode != LockMode::EXCLUSIVE && lock_mode != LockMode::INTENTION_EXCLUSIVE) {
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
+    }
+    if (txn->GetState() != TransactionState::GROWING) {
+      throw TransactionAbortException(txn->GetTransactionId(), AbortReason::LOCK_ON_SHRINKING);
+    }
+  }
+  return true;
 }
 
 }  // namespace bustub

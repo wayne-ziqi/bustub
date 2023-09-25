@@ -72,6 +72,21 @@ class LockManager {
     txn_id_t upgrading_ = INVALID_TXN_ID;
     /** coordination */
     std::mutex latch_;
+
+    auto GetRequest(txn_id_t txn_id) -> std::shared_ptr<LockRequest> {
+      for (auto &request : request_queue_) {
+        if (request->txn_id_ == txn_id) {
+          return request;
+        }
+      }
+      return nullptr;
+    }
+
+    auto PushBack(std::shared_ptr<LockRequest> request) -> void { request_queue_.push_back(request); }
+
+    auto PopFront() -> void { request_queue_.pop_front(); }
+
+    auto GetFront() -> std::shared_ptr<LockRequest> { return request_queue_.front(); }
   };
 
   /**
@@ -319,9 +334,34 @@ class LockManager {
  private:
   /** Spring 2023 */
   /* You are allowed to modify all functions below. */
+
+  /**
+   *  upgrade lock on table, refer to [LockNote] in header file for more details
+   * @return true if upgrade successfully and no error occurs, false if the transaction has already held a lock with the same mode
+   * errors are thrown as exceptions
+   */
   auto UpgradeLockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool;
+
+  /**
+   * This function is called when a txn wants to upgrade its lock on a row.
+   * @return true if upgrade successfully and no error occurs, false otherwise
+   */
   auto UpgradeLockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool;
+
+  /**
+   * check if L1 and L2 is compatible according to the compatibility matrix
+   * @param l1
+   * @param l2
+   * @return
+   */
   auto AreLocksCompatible(LockMode l1, LockMode l2) -> bool;
+
+  /**
+   * the function always returns true, but it will abort the transaction and throw a TransactionAbortException
+   * @param txn
+   * @param lock_mode
+   * @return
+   */
   auto CanTxnTakeLock(Transaction *txn, LockMode lock_mode) -> bool;
   void GrantNewLocksIfPossible(LockRequestQueue *lock_request_queue);
   auto CanLockUpgrade(LockMode curr_lock_mode, LockMode requested_lock_mode) -> bool;

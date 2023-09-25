@@ -16,11 +16,30 @@
 #include <utility>
 #include <vector>
 
+#include "common/util/hash_util.h"
 #include "binder/table_ref/bound_join_ref.h"
 #include "execution/expressions/abstract_expression.h"
 #include "execution/plans/abstract_plan.h"
 
 namespace bustub {
+
+
+struct HashJoinKey {
+  std::vector<Value> keys_;
+
+  auto operator==(const HashJoinKey &other) const -> bool {
+    if (keys_.size() != other.keys_.size()) {
+      return false;
+    }
+    for (int i = 0; i < static_cast<int>(keys_.size()); i++) {
+      if (keys_[i].CompareEquals(other.keys_[i]) != CmpBool::CmpTrue) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+};
 
 /**
  * Hash join performs a JOIN operation with a hash table.
@@ -76,8 +95,20 @@ class HashJoinPlanNode : public AbstractPlanNode {
   /** The join type */
   JoinType join_type_;
 
+
  protected:
   auto PlanNodeToString() const -> std::string override;
 };
 
 }  // namespace bustub
+
+template <>
+struct std::hash<bustub::HashJoinKey> {
+  auto operator()(const bustub::HashJoinKey &agg_key) const -> size_t {
+    size_t hash = 0;
+    for (const auto &key : agg_key.keys_) {
+      hash = bustub::HashUtil::CombineHashes(hash, bustub::HashUtil::HashValue(&key));
+    }
+    return hash;
+  }
+};

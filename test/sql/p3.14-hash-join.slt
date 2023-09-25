@@ -348,6 +348,7 @@ create table t2(v1 int, v2 int);
 statement ok
 insert into t2 values (0, 45), (0, 45), (0, 65), (1, 45), (1, 45), (1, 65), (2, 45);
 
+# optimizer failed
 query rowsort +ensure:hash_join
 select * from temp_2 inner join t2 on v2 = colA;
 ----

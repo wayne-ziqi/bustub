@@ -1,7 +1,7 @@
 # --- NOT TESTED IN SPRING 2023 ---
 
 statement ok
-set force_optimizer_starter_rule=yes
+set force_optimizer_starter_rule=yes;
 
 statement ok
 create table temp_1(colA int, colB int, colC int, colD int);
