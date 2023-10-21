@@ -23,7 +23,11 @@ InsertExecutor::InsertExecutor(ExecutorContext *exec_ctx, const InsertPlanNode *
       child_executor_(std::move(child_executor)),
       table_info_(exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid())) {}
 
-void InsertExecutor::Init() {}
+void InsertExecutor::Init() {
+  // take a table lock
+  exec_ctx_->GetLockManager()->LockTable(exec_ctx_->GetTransaction(), LockManager::LockMode::EXCLUSIVE,
+                                         plan_->GetTableOid());
+}
 
 auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   Tuple child_tuple = Tuple();
@@ -33,16 +37,28 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   while (child_executor_->Next(&child_tuple, &child_rid)) {
     tuple_found = true;
     cnt++;
+    /// insert tuple
     auto *meta = new TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false};
-    auto insert_rid = table_info_->table_->InsertTuple(*meta, child_tuple, nullptr, nullptr, 0);
+    auto insert_rid = table_info_->table_->InsertTuple(*meta, child_tuple, exec_ctx_->GetLockManager(),
+                                                       exec_ctx_->GetTransaction(), plan_->GetTableOid());
     if (insert_rid == std::nullopt) {
       return false;
     }
+    // record the insert into the transaction table write set
+    auto tab_wr_record = new TableWriteRecord{plan_->GetTableOid(), *rid, table_info_->table_.get()};
+    tab_wr_record->wtype_ = WType::INSERT;
+    exec_ctx_->GetTransaction()->AppendTableWriteRecord(*tab_wr_record);
+
+    /// process indexes
     auto index_vec = exec_ctx_->GetCatalog()->GetTableIndexes(table_info_->name_);
     for (auto &index : index_vec) {
       index->index_->InsertEntry(
           child_tuple.KeyFromTuple(table_info_->schema_, index->key_schema_, index->index_->GetKeyAttrs()),
           insert_rid.value(), exec_ctx_->GetTransaction());
+      // record the insert into the transaction index write set
+      auto idx_wr_record = new IndexWriteRecord{insert_rid.value(), index->index_oid_, WType::INSERT,
+                                                child_tuple,        index->index_oid_, exec_ctx_->GetCatalog()};
+      exec_ctx_->GetTransaction()->AppendIndexWriteRecord(*idx_wr_record);
     }
   }
 

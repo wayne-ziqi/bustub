@@ -32,10 +32,22 @@ void TransactionManager::Commit(Transaction *txn) {
 
 void TransactionManager::Abort(Transaction *txn) {
   /* TODO: revert all the changes in write set */
+  while (!txn->GetWriteSet()->empty()) {
+    auto wr_record = txn->GetWriteSet()->back();
+    txn->GetWriteSet()->pop_back();
+    if (wr_record.wtype_ == WType::INSERT) {
+      wr_record.table_heap_->UpdateTupleMeta(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, true}, wr_record.rid_);
+    } else if (wr_record.wtype_ == WType::DELETE) {
+      wr_record.table_heap_->UpdateTupleMeta(TupleMeta{INVALID_TXN_ID, INVALID_TXN_ID, false}, wr_record.rid_);
+    } else {
+      throw NotImplementedException("update is not implemented!");
+    }
+  }
 
   ReleaseLocks(txn);
 
   txn->SetState(TransactionState::ABORTED);
+
 }
 
 void TransactionManager::BlockAllTransactions() { UNIMPLEMENTED("block is not supported now!"); }

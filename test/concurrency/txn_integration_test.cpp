@@ -27,10 +27,11 @@ void CommitTest1() {
   auto txn2 = Begin(*db, IsolationLevel::READ_UNCOMMITTED);
   Scan(txn2, *db, {1, 233, 234});
   Commit(*db, txn2);
+  EXPECT_TRUE(true);
 }
 
 // NOLINTNEXTLINE
-TEST(CommitAbortTest, DISABLED_CommitTestA) { CommitTest1(); }
+TEST(CommitAbortTest, CommitTestA) { CommitTest1(); }
 
 void Test1(IsolationLevel lvl) {
   // should scan changes of committed txn
@@ -44,13 +45,13 @@ void Test1(IsolationLevel lvl) {
 }
 
 // NOLINTNEXTLINE
-TEST(VisibilityTest, DISABLED_TestA) {
+TEST(VisibilityTest, TestA) {
   // only this one will be public :)
   Test1(IsolationLevel::READ_COMMITTED);
 }
 
 // NOLINTNEXTLINE
-TEST(IsolationLevelTest, DISABLED_InsertTestA) {
+TEST(IsolationLevelTest, InsertTestA) {
   ExpectTwoTxn("InsertTestA.1", IsolationLevel::READ_UNCOMMITTED, IsolationLevel::READ_UNCOMMITTED, false, IS_INSERT,
                ExpectedOutcome::DirtyRead);
 }

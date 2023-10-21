@@ -66,7 +66,7 @@ class LockManager {
    public:
     /** List of lock requests for the same resource (table or row) */
     std::list<std::shared_ptr<LockRequest>> request_queue_;
-    /** For notifying blocked transactions on this rid */
+    /** For notifying blocked transactions on this resource */
     std::condition_variable cv_;
     /** txn_id of an upgrading transaction (if any) */
     txn_id_t upgrading_ = INVALID_TXN_ID;
@@ -82,7 +82,40 @@ class LockManager {
       return nullptr;
     }
 
-    auto PushBack(std::shared_ptr<LockRequest> request) -> void { request_queue_.push_back(request); }
+    auto RemoveRequest(txn_id_t txn_id) -> void {
+      for (auto iter = request_queue_.begin(); iter != request_queue_.end(); iter++) {
+        if ((*iter)->txn_id_ == txn_id) {
+          request_queue_.erase(iter);
+          return;
+        }
+      }
+    }
+
+    auto GetFirstUnGrantedIter() -> std::list<std::shared_ptr<LockRequest>>::iterator {
+      return std::find_if(request_queue_.begin(), request_queue_.end(),
+                          [](const std::shared_ptr<LockRequest> &request) { return !request->granted_; });
+    }
+
+    auto End() -> std::list<std::shared_ptr<LockRequest>>::iterator { return request_queue_.end(); }
+
+    auto Begin() -> std::list<std::shared_ptr<LockRequest>>::iterator { return request_queue_.begin(); }
+
+    auto Size() -> size_t { return request_queue_.size(); }
+
+    auto NewLockCompatible(LockMode lock_mode, txn_id_t my_txn_id) -> bool {
+      for (auto &request : request_queue_) {
+        if (request->granted_ && request->txn_id_ != my_txn_id && !AreLocksCompatible(request->lock_mode_, lock_mode)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    auto Lock() -> void { latch_.lock(); }
+
+    auto Unlock() -> void { latch_.unlock(); }
+
+    auto PushBack(const std::shared_ptr<LockRequest> &request) -> void { request_queue_.push_back(request); }
 
     auto PopFront() -> void { request_queue_.pop_front(); }
 
@@ -314,10 +347,11 @@ class LockManager {
 
   /**
    * Checks if the graph has a cycle, returning the newest transaction ID in the cycle if so.
-   * @param[out] txn_id if the graph has a cycle, will contain the newest transaction ID
-   * @return false if the graph has no cycle, otherwise stores the newest transaction ID in the cycle to txn_id
+   * @param[out] txn_id_out if the graph has a cycle, will contain the newest transaction ID
+   * @return false if the graph has no cycle, otherwise stores the newest transaction ID in the cycle to txn_id_out
    */
-  auto HasCycle(txn_id_t *txn_id) -> bool;
+  auto HasCycle(txn_id_t *txn_id_out) -> bool;
+
 
   /**
    * @return all edges in current waits_for graph
@@ -335,12 +369,19 @@ class LockManager {
   /** Spring 2023 */
   /* You are allowed to modify all functions below. */
 
+  auto DFSCycle(txn_id_t cur_txn, txn_id_t par_txn, std::unordered_map<txn_id_t, int> &color,
+               std::unordered_map<txn_id_t, int> &parents, std::unordered_set<txn_id_t> &cycle, bool &found) -> void;
+
+  auto BuildWaitsFor() -> void;
+
+
   /**
    *  upgrade lock on table, refer to [LockNote] in header file for more details
-   * @return true if upgrade successfully and no error occurs, false if the transaction has already held a lock with the same mode
-   * errors are thrown as exceptions
+   * @return true if upgrade successfully and no error occurs, false if the transaction has already held a lock with the
+   * same mode errors are thrown as exceptions
    */
-  auto UpgradeLockTable(Transaction *txn, LockMode lock_mode, const table_oid_t &oid) -> bool;
+  auto UpgradeLockTable(Transaction *txn, LockManager::LockMode old_mode, LockMode lock_mode, const table_oid_t &oid)
+      -> bool;
 
   /**
    * This function is called when a txn wants to upgrade its lock on a row.
@@ -349,21 +390,45 @@ class LockManager {
   auto UpgradeLockRow(Transaction *txn, LockMode lock_mode, const table_oid_t &oid, const RID &rid) -> bool;
 
   /**
+   * used in UnlockTable and UnlockRow to transfer the transaction state
+   * Attention: remember to grant the latch before invoking this function
+   * @param txn
+   * @param lock_mode
+   */
+  auto UpgradeTransactionState(Transaction *txn, LockMode lock_mode) -> void;
+
+  /**
    * check if L1 and L2 is compatible according to the compatibility matrix
    * @param l1
    * @param l2
    * @return
    */
-  auto AreLocksCompatible(LockMode l1, LockMode l2) -> bool;
+  static auto AreLocksCompatible(LockMode l1, LockMode l2) -> bool;
 
   /**
    * the function always returns true, but it will abort the transaction and throw a TransactionAbortException
+   * should take care of the Exception, which should only be thrown in the txn's thread, not in other threads
    * @param txn
    * @param lock_mode
    * @return
    */
   auto CanTxnTakeLock(Transaction *txn, LockMode lock_mode) -> bool;
-  void GrantNewLocksIfPossible(LockRequestQueue *lock_request_queue);
+
+  auto GetTxnTableLockMode(Transaction *txn, const table_oid_t &oid) -> LockMode;
+
+  auto GetTxnRowLockMode(Transaction *txn, const table_oid_t &oid, const RID &rid) -> LockMode;
+
+  auto GetTxnTableLockSet(Transaction *txn, LockMode lock_mode) -> std::shared_ptr<std::unordered_set<table_oid_t>>;
+
+  auto GetTxnRowLockSet(Transaction *txn, LockMode lock_mode)
+      -> std::shared_ptr<std::unordered_map<table_oid_t, std::unordered_set<RID>>>;
+
+  /**
+   * should be invoked after a new request is appended to the lock queue to try to wake from the waiting queue
+   * should release the latch on the queue before waking up the waiting txn
+   * @param lock_request_queue
+   */
+  void GrantNewLocksIfPossible(std::shared_ptr<LockRequestQueue> &lock_request_queue);
   auto CanLockUpgrade(LockMode curr_lock_mode, LockMode requested_lock_mode) -> bool;
   auto CheckAppropriateLockOnTable(Transaction *txn, const table_oid_t &oid, LockMode row_lock_mode) -> bool;
   auto FindCycle(txn_id_t source_txn, std::vector<txn_id_t> &path, std::unordered_set<txn_id_t> &on_path,
@@ -383,7 +448,7 @@ class LockManager {
   std::atomic<bool> enable_cycle_detection_;
   std::thread *cycle_detection_thread_;
   /** Waits-for graph representation. */
-  std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
+  std::unordered_map<txn_id_t, std::unordered_set<txn_id_t>> waits_for_;
   std::mutex waits_for_latch_;
 };
 
